@@ -1,6 +1,7 @@
 const { StatusCodes } = require("http-status-codes");
 const { UserRepository } = require("../repositories");
 const AppError = require("../utils/errors/app-error");
+const { auth } = require("../utils/common");
 
 const userRepository = new UserRepository()
 async function create(data){
@@ -21,5 +22,27 @@ async function create(data){
         }
     }
 }
+async function signin(data){
+    try {
+        const response = await userRepository.getUserbyEmail(data.email);
+        if(!response){
+            throw new AppError('User not found',StatusCodes.UNAUTHORIZED)
+        }
+        const passwordMatch = auth.checkPassword(data.password,response.password)
+        if(!passwordMatch){
+            throw new AppError('Password did not match',StatusCodes.UNAUTHORIZED)
+        }
+        const jwt = auth.createToken({id:response.id,email:response.email})
+        return jwt
+    } catch (error) {
+        console.log(error);
+        
+        if(error instanceof AppError){
+            throw error
+        }
+        throw new AppError(error.message,StatusCodes.INTERNAL_SERVER_ERROR)
+    }
+}
 
-module.exports = {create}
+
+module.exports = {create,signin}
