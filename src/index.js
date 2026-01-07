@@ -2,10 +2,16 @@ const express = require('express');
 
 const { ServerConfig } = require('./config');
 const apiRoutes = require('./routes');
-
+const rateLimit = require('express-rate-limit')
 const app = express();
+const limiter = rateLimit({
+    windowMs: 2* 60* 1000,
+    max:5,
+
+})
 app.use(express.json())
 app.use(express.urlencoded())
+app.use(limiter)
 app.use('/api', apiRoutes);
 
 app.listen(ServerConfig.PORT, () => {
