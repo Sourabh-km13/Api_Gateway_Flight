@@ -32,4 +32,15 @@ async function checkAuth(req,res,next){
         
 
 }
-module.exports = {validateAuthRequest, checkAuth}
+async function isAdmin(req,res,next){
+    try {
+            const response = await UserService.isAdmin(req.body.id)
+            if(!response){
+                throw new AppError('Unauthorized to change roles',StatusCodes.UNAUTHORIZED)
+            }
+            next()
+        } catch (error) {
+            res.status(error.statusCode).json(error)
+        }
+}
+module.exports = {validateAuthRequest, checkAuth, isAdmin}

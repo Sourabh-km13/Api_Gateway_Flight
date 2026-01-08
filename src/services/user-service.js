@@ -8,11 +8,13 @@ const roleRepository = new RoleRepository()
 async function create(data){
     try {
         const user = await userRepository.create(data)
+        if(!user){
+            throw new AppError('Error in creating user')
+        }
         const role = await roleRepository.getrolebyName(Enums.USER_ROLES_ENUMS.CUSTOMER)
         await user.addRole(role)
         return user 
     } catch (error) {
-        console.log(error)
         if(error.name==='SequelizeValidationError' || error.name ==='SequelizeUniqueConstraintError'){
             let explanation = []
             error.errors.forEach(err => {
@@ -71,5 +73,43 @@ async function isAuthenticated(token){
         throw new AppError(error.message,StatusCodes.INTERNAL_SERVER_ERROR)
     }
 }
+async function addRoletoUser(data){
+    try {
+        const user = await userRepository.get(data.id)
+        if(!user){
+            throw new AppError('Error in creating user',StatusCodes.INTERNAL_SERVER_ERROR)
+        }
+        const role = await roleRepository.getrolebyName(data.role)
+        if(!role){
+            throw new AppError('given role not found',StatusCodes.NOT_FOUND)
+        }
+        user.addRole(role)
+        return user
+    } catch (error) {
+        if(error instanceof AppError){
+            throw error
+        }
+        else{
+            throw new AppError(`something went wrong while assigning role ${error.message}`,StatusCodes.INTERNAL_SERVER_ERROR)
+        }
+    }
+}
 
-module.exports = {create,signin,isAuthenticated}
+async function isAdmin(id){
+    try {
+        const user = await userRepository.get(id)
+        if(!user){
+            throw new AppError('User not found',StatusCodes.NOT_FOUND)
+        }
+        const adminRole = await roleRepository.getrolebyName(Enums.USER_ROLES_ENUMS.ADMIN)
+        return user.hasRole(adminRole)
+    } catch (error) {
+        if(error instanceof AppError){
+            throw error
+        }
+        else{
+            throw new AppError(`something went wrong  ${error.message}`,StatusCodes.INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+module.exports = {create,signin,isAuthenticated, addRoletoUser, isAdmin}
