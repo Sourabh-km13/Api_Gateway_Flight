@@ -5,25 +5,29 @@ const apiRoutes = require('./routes');
 const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const serverConfig = require('./config/server-config');
+const { AuthMiddleWares } = require('./middlewares');
 const app = express();
 const limiter = rateLimit({
     windowMs: 2* 60* 1000,
     max:500,
 
 })
-app.use(express.json())
-app.use(express.urlencoded())
+console.log(serverConfig.FLIGHT_SERVICE);
+console.log(serverConfig.BOOKING_SERVICE);
+
 app.use(limiter)
-app.use('/flightservice',createProxyMiddleware({
-    target:serverConfig.FLIGHT_SERVICE,
+app.use('/flightservice',AuthMiddleWares.checkAuth, createProxyMiddleware({
+    target: serverConfig.FLIGHT_SERVICE,
     changeOrigin:true,
     pathRewrite:{'^/flightservice':'/'}
 }))
-app.use('/bookingservice',createProxyMiddleware({
+app.use('/bookingservice', AuthMiddleWares.checkAuth, createProxyMiddleware({
     target:serverConfig.BOOKING_SERVICE,
     changeOrigin:true,
     pathRewrite:{'^/bookingservice':'/'}
 }))
+app.use(express.json())
+app.use(express.urlencoded({extended:true}))
 app.use('/api', apiRoutes);
 
 app.listen(ServerConfig.PORT, () => {
