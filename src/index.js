@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 
 const { ServerConfig } = require('./config');
 const apiRoutes = require('./routes');
@@ -17,6 +18,12 @@ console.log(serverConfig.FLIGHT_SERVICE);
 console.log(serverConfig.BOOKING_SERVICE);
 
 app.use(limiter)
+
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'x-access-token', 'Authorization'],
+}));
 app.use('/flightservice',AuthMiddleWares.checkAuth, createProxyMiddleware({
     target: serverConfig.FLIGHT_SERVICE,
     changeOrigin:true,
