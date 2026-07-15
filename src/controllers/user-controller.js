@@ -50,6 +50,29 @@ async function signin(req , res){
         }
     }
 }
+async function adminSignin(req , res){
+    try {
+        const response = await UserService.adminSignin({
+            email:req.body.email,
+            password:req.body.password,
+        })
+        successResponse.data = response
+        res.status(StatusCodes.OK).json(successResponse)
+    } catch (error) {
+        if(error instanceof AppError){
+            failResponse.data = error
+            res.status(error.statusCode).json({
+                failResponse
+            })
+        }
+        else{
+            failResponse.message = error.message
+            res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                failResponse
+            })
+        }
+    }
+}
 async function addRoletoUser(req , res){
     try {
         const response = await UserService.addRoletoUser({
@@ -74,5 +97,5 @@ async function addRoletoUser(req , res){
     }
 }
 module.exports = {
-    createUser,signin,addRoletoUser
+    createUser,signin,adminSignin,addRoletoUser
 }

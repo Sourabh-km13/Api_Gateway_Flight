@@ -49,6 +49,33 @@ async function signin(data){
         throw new AppError(error.message,StatusCodes.INTERNAL_SERVER_ERROR)
     }
 }
+async function adminSignin(data){
+    try {
+        const response = await userRepository.getUserbyEmail(data.email);
+        if(!response){
+            throw new AppError('User not found',StatusCodes.UNAUTHORIZED)
+        }
+        const passwordMatch = auth.checkPassword(data.password,response.password)
+        if(!passwordMatch){
+            throw new AppError('Password did not match',StatusCodes.UNAUTHORIZED)
+        }
+        const isUserAdmin = await isAdmin(response.id)
+        if(!isUserAdmin){
+            throw new AppError('Not authorized as admin',StatusCodes.UNAUTHORIZED)
+        }
+        const jwt = auth.createToken({
+            id:response.id,
+            email:response.email,
+            role:Enums.USER_ROLES_ENUMS.ADMIN
+        })
+        return jwt
+    } catch (error) {
+        if(error instanceof AppError){
+            throw error
+        }
+        throw new AppError(error.message,StatusCodes.INTERNAL_SERVER_ERROR)
+    }
+}
 async function isAuthenticated(token){
     try {
         
@@ -112,4 +139,4 @@ async function isAdmin(id){
         }
     }
 }
-module.exports = {create,signin,isAuthenticated, addRoletoUser, isAdmin}
+module.exports = {create,signin,adminSignin,isAuthenticated, addRoletoUser, isAdmin}

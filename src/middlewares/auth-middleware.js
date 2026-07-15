@@ -34,13 +34,13 @@ async function checkAuth(req,res,next){
 }
 async function isAdmin(req,res,next){
     try {
-            const response = await UserService.isAdmin(req.body.id)
+            const response = await UserService.isAdmin(req.user)
             if(!response){
-                throw new AppError('Unauthorized to change roles',StatusCodes.UNAUTHORIZED)
+                throw new AppError('Unauthorized: admin role required',StatusCodes.UNAUTHORIZED)
             }
             next()
         } catch (error) {
-            res.status(error.statusCode).json(error)
+            res.status(error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json(error)
         }
 }
 module.exports = {validateAuthRequest, checkAuth, isAdmin}
