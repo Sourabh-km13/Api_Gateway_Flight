@@ -10,24 +10,28 @@ const serverConfig = require('./config/server-config');
 const { AuthMiddleWares } = require('./middlewares');
 const app = express();
 const limiter = rateLimit({
-    windowMs: 2* 60* 1000,
-    max:500,
-
+    windowMs: 2 * 60 * 1000,
+    max: 500,
 })
-console.log(serverConfig.FLIGHT_SERVICE);
-console.log(serverConfig.BOOKING_SERVICE);
+
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'API Gateway is healthy'
+    });
+});
 
 app.use(limiter)
 
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-access-token', 'Authorization'],
 }));
-app.use('/flightservice',AuthMiddleWares.checkAuth, createProxyMiddleware({
+app.use('/flightservice', AuthMiddleWares.checkAuth, createProxyMiddleware({
     target: serverConfig.FLIGHT_SERVICE,
-    changeOrigin:true,
-    pathRewrite:{'^/flightservice':'/'}
+    changeOrigin: true,
+    pathRewrite: { '^/flightservice': '/' }
 }))
 app.use(
     '/admin/flightservice',
@@ -40,12 +44,12 @@ app.use(
     }),
 )
 app.use('/bookingservice', AuthMiddleWares.checkAuth, createProxyMiddleware({
-    target:serverConfig.BOOKING_SERVICE,
-    changeOrigin:true,
-    pathRewrite:{'^/bookingservice':'/'}
+    target: serverConfig.BOOKING_SERVICE,
+    changeOrigin: true,
+    pathRewrite: { '^/bookingservice': '/' }
 }))
 app.use(express.json())
-app.use(express.urlencoded({extended:true}))
+app.use(express.urlencoded({ extended: true }))
 app.use('/api', apiRoutes);
 app.use('/admin', adminRouter);
 

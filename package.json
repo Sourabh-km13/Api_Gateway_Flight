@@ -4,6 +4,7 @@
   "description": "API gateway with auth, RBAC, and service proxy for FlySmart",
   "main": "index.js",
   "scripts": {
+    "start": "node src/index.js",
     "dev": "npx nodemon src/index.js"
   },
   "author": "sourabh",
