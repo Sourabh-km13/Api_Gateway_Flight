@@ -1,48 +1,202 @@
-This is a base node js project template, which anyone can use as it has been prepared, by keeping some of the most important code principles and project management recommendations. Feel free to change anything. 
+# API Gateway — FlySmart
 
+Node.js **API Gateway** for the FlySmart flight booking platform. Owns authentication, role-based access control (RBAC), rate limiting, and reverse-proxy routing to the Flight and Booking microservices.
 
-`src` -> Inside the src folder all the actual source code regarding the project will reside, this will not include any kind of tests. (You might want to make separate tests folder)
+**Resume highlight:** BFF-style gateway with JWT auth, multi-role RBAC, admin-gated mutation paths, and authenticated reverse proxies to internal services.
 
-Lets take a look inside the `src` folder
+---
 
- - `config` -> In this folder anything and everything regarding any configurations or setup of a library or module will be done. For example: setting up `dotenv` so that we can use the environment variables anywhere in a cleaner fashion, this is done in the `server-config.js`. One more example can be to setup you logging library that can help you to prepare meaningful logs, so configuration for this library should also be done here. 
+## Role in the system
 
- - `routes` -> In the routes folder, we register a route and the corresponding middleware and controllers to it. 
+```text
+Client (React)
+      │  x-access-token
+      ▼
+┌──────────────────────────────────────────┐
+│           Api_Gateway_Flight             │
+│  • Signup / Signin / Admin Signin        │
+│  • JWT issue & verify                    │
+│  • isAdmin middleware                    │
+│  • Rate limit (500 req / 2 min)          │
+│  • Proxy → Flight & Booking services     │
+└───────┬───────────────────┬──────────────┘
+        │                   │
+        ▼                   ▼
+  Flight-Service      Booking-Service
+```
 
- - `middlewares` -> they are just going to intercept the incoming requests where we can write our validators, authenticators etc. 
+This service is the **security boundary**. Downstream services trust that authenticated traffic arrives through the gateway.
 
- - `controllers` -> they are kind of the last middlewares as post them you call you business layer to execute the budiness logic. In controllers we just receive the incoming requests and data and then pass it to the business layer, and once business layer returns an output, we structure the API response in controllers and send the output. 
+---
 
- - `repositories` -> this folder contains all the logic using which we interact the DB by writing queries, all the raw queries or ORM queries will go here.
+## Capabilities
 
- - `services` -> contains the buiness logic and interacts with repositories for data from the database
+| Capability | Detail |
+|------------|--------|
+| User auth | Signup & signin with bcrypt + JWT |
+| Default role | New users always get `customer` (no public admin signup) |
+| Admin auth | `POST /admin/signin` — rejects non-admins; JWT includes `role: 'admin'` |
+| RBAC | Roles: `admin`, `customer`, `flightcompany` via `User ↔ Roles` |
+| Customer proxy | `/flightservice/*`, `/bookingservice/*` — requires valid JWT |
+| Admin proxy | `/admin/flightservice/*` — requires JWT **and** admin role |
+| Rate limiting | Global Express rate limiter |
+| Layered design | Routes → Controllers → Services → Repositories → Models |
 
- - `utils` -> contains helper methods, error classes etc.
+---
 
-### Setup the project
+## Tech stack
 
- - Download this template from github and open it in your favourite text editor. 
- - Go inside the folder path and execute the following command:
-  ```
-  npm install
-  ```
- - In the root directory create a `.env` file and add the following env variables
-    ```
-        PORT=<port number of your choice>
-    ```
-    ex: 
-    ```
-        PORT=3000
-    ```
- - go inside the `src` folder and execute the following command:
-    ```
-      npx sequelize init
-    ```
- - By executing the above command you will get migrations and seeders folder along with a config.json inside the config folder. 
- - If you're setting up your development environment, then write the username of your db, password of your db and in dialect mention whatever db you are using for ex: mysql, mariadb etc
- - If you're setting up test or prod environment, make sure you also replace the host with the hosted db url.
+- **Runtime:** Node.js, Express
+- **ORM:** Sequelize + MySQL
+- **Auth:** bcrypt, jsonwebtoken
+- **Proxy:** http-proxy-middleware
+- **Ops:** express-rate-limit, winston, dotenv
 
- - To run the server execute
- ```
- npm run dev
- ```
+---
+
+## Route map
+
+### Auth (local)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/user/signup` | Public | Create user + assign `customer` |
+| POST | `/api/v1/user/signin` | Public | JWT `{ id, email }` |
+| POST | `/api/v1/user/role` | Admin | Assign a role to a user |
+| GET | `/api/v1/info` | JWT | Health/info |
+| POST | `/admin/signin` | Public* | Admin-only login → JWT `{ id, email, role: 'admin' }` |
+
+\*Credentials are public to call; non-admin accounts receive `401`.
+
+### Proxies
+
+| Mount | Middleware | Target env | Rewrite |
+|-------|------------|------------|---------|
+| `/flightservice` | `checkAuth` | `FLIGHT_SERVICE` | `^/flightservice` → `/` |
+| `/admin/flightservice` | `checkAuth` + `isAdmin` | `FLIGHT_SERVICE` | `^/admin/flightservice` → `/` |
+| `/bookingservice` | `checkAuth` | `BOOKING_SERVICE` | `^/bookingservice` → `/` |
+
+**JWT header:** `x-access-token`
+
+---
+
+## Database design
+
+MySQL schema owned by the gateway (identity & authorization only).
+
+```text
+Users ──────── <UserRoles> ──────── Roles
+  id                 UserId            id
+  email (unique)     RoleId            name (ENUM)
+  password (hash)                      admin | customer | flightcompany
+```
+
+### Tables
+
+**Users**
+| Column | Type | Notes |
+|--------|------|-------|
+| id | INTEGER PK | Auto-increment |
+| email | STRING | Unique, validated email |
+| password | STRING | bcrypt-hashed on `beforeCreate` |
+| createdAt / updatedAt | DATE | |
+
+**Roles**
+| Column | Type | Notes |
+|--------|------|-------|
+| id | INTEGER PK | |
+| name | ENUM | `admin`, `customer`, `flightcompany` (default `customer`) |
+| createdAt / updatedAt | DATE | |
+
+**UserRoles** (join)
+| Column | Type | Notes |
+|--------|------|-------|
+| id | INTEGER PK | |
+| UserId | INTEGER FK → Users | |
+| RoleId | INTEGER FK → Roles | |
+| createdAt / updatedAt | DATE | |
+
+### Associations
+- `User.belongsToMany(Roles, { through: UserRoles })`
+- `Roles.belongsToMany(User, { through: UserRoles })`
+
+### Seeders
+1. Roles seeder — inserts `admin`, `customer`, `flightcompany`
+2. Admin user seeder — creates a bootstrap admin and links the `admin` role  
+   (defaults: `admin@flysmart.com` / `admin123`; override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
+
+```bash
+npm run db:seed          # all seeders
+npm run db:seed:admin    # admin user only
+```
+
+---
+
+## Project structure
+
+```text
+src/
+  config/          # dotenv server config, sequelize config.json
+  controllers/     # HTTP adapters
+  middlewares/     # validateAuthRequest, checkAuth, isAdmin
+  models/          # User, Roles, UserRoles
+  migrations/      # schema evolution
+  repositories/    # data access
+  routes/          # /api/v1 + /admin
+  seeders/         # roles + admin bootstrap
+  services/        # signup, signin, adminSignin, isAdmin
+  utils/           # JWT helpers, enums, AppError, winston
+  index.js         # rate limit, proxies, routes, listen
+```
+
+---
+
+## Configuration
+
+Create `.env` (and Sequelize `src/config/config.json`):
+
+```bash
+PORT=3001
+FLIGHT_SERVICE=http://localhost:<flight-port>
+BOOKING_SERVICE=http://localhost:<booking-port>
+SALT_ROUNDS=10
+JWT_KEY=your-secret
+JWT_EXPIRY=1d
+# optional for admin seeder
+ADMIN_EMAIL=admin@flysmart.com
+ADMIN_PASSWORD=admin123
+```
+
+### Run
+
+```bash
+npm install
+npx sequelize-cli db:migrate
+npm run db:seed
+npm run dev
+```
+
+---
+
+## Security design notes
+
+1. **Admin creation is DB-only** — signup never grants `admin`.
+2. **`isAdmin` uses `req.user`** from verified JWT (not a spoofable body id).
+3. **Customer vs admin mutation paths** — catalog writes are intended via `/admin/flightservice`.
+4. **Rate limiting** protects the public edge before auth and proxy work.
+
+---
+
+## Related services
+
+| Repo | Responsibility |
+|------|----------------|
+| [Flight-Frontend](../Flight-Frontend) | Traveler + admin SPA |
+| [Flight-Service](../Flight-Service) | Flight catalog & seat inventory |
+| [Flight-booking-Service](../Flight-booking-Service) | Bookings, payment hold, cron |
+
+---
+
+## License
+
+Private / educational project.
