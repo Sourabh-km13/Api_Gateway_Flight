@@ -1,8 +1,6 @@
 # API Gateway — FlySmart
 
-Node.js **API Gateway** for the FlySmart flight booking platform. Owns authentication, role-based access control (RBAC), rate limiting, and reverse-proxy routing to the Flight and Booking microservices.
-
-**Resume highlight:** BFF-style gateway with JWT auth, multi-role RBAC, admin-gated mutation paths, and authenticated reverse proxies to internal services.
+API Gateway for the flight booking platform, serving as the single entry point for all client requests. It handles JWT authentication, role-based access control (RBAC), rate limiting, and reverse-proxy routing before forwarding requests to the Flight and Booking microservices.
 
 ---
 
@@ -29,6 +27,21 @@ This service is the **security boundary**. Downstream services trust that authen
 
 ---
 
+## What this service does
+
+- Centralizes **user identity** (signup, signin, password hashing) so Flight and Booking services stay free of auth logic
+- Issues and verifies **JWTs** (`x-access-token`) for every protected customer and admin request
+- Implements **RBAC** with roles `admin`, `customer`, and `flightcompany` via a many-to-many `User ↔ Roles` model
+- Forces new signups into the **`customer`** role only — admins are created in the DB / seeder, never via public signup
+- Provides a dedicated **`POST /admin/signin`** that rejects non-admins and returns a JWT with `role: 'admin'`
+- Reverse-proxies **Flight** and **Booking** APIs behind authenticated mounts with path rewrite
+- Separates **admin catalog mutations** (`/admin/flightservice`) from customer reads (`/flightservice`) using `checkAuth` + `isAdmin`
+- Applies a global **rate limiter** (500 requests / 2 minutes) at the edge
+- Uses a layered architecture: routes → controllers → services → repositories → Sequelize models
+- Surfaces consistent errors via `AppError` + Winston logging
+
+---
+
 ## Capabilities
 
 | Capability | Detail |
@@ -37,10 +50,12 @@ This service is the **security boundary**. Downstream services trust that authen
 | Default role | New users always get `customer` (no public admin signup) |
 | Admin auth | `POST /admin/signin` — rejects non-admins; JWT includes `role: 'admin'` |
 | RBAC | Roles: `admin`, `customer`, `flightcompany` via `User ↔ Roles` |
+| Role assignment | `POST /api/v1/user/role` — authenticated admin can attach roles |
 | Customer proxy | `/flightservice/*`, `/bookingservice/*` — requires valid JWT |
 | Admin proxy | `/admin/flightservice/*` — requires JWT **and** admin role |
 | Rate limiting | Global Express rate limiter |
 | Layered design | Routes → Controllers → Services → Repositories → Models |
+| Bootstrap | Roles seeder + optional admin-user seeder |
 
 ---
 
@@ -50,7 +65,7 @@ This service is the **security boundary**. Downstream services trust that authen
 - **ORM:** Sequelize + MySQL
 - **Auth:** bcrypt, jsonwebtoken
 - **Proxy:** http-proxy-middleware
-- **Ops:** express-rate-limit, winston, dotenv
+- **Ops:** express-rate-limit, winston, dotenv, sequelize-cli
 
 ---
 
@@ -184,6 +199,7 @@ npm run dev
 2. **`isAdmin` uses `req.user`** from verified JWT (not a spoofable body id).
 3. **Customer vs admin mutation paths** — catalog writes are intended via `/admin/flightservice`.
 4. **Rate limiting** protects the public edge before auth and proxy work.
+5. **Single public entrypoint** — Flight and Booking services are not meant to be exposed directly to browsers.
 
 ---
 
@@ -193,7 +209,7 @@ npm run dev
 |------|----------------|
 | [Flight-Frontend](../Flight-Frontend) | Traveler + admin SPA |
 | [Flight-Service](../Flight-Service) | Flight catalog & seat inventory |
-| [Flight-booking-Service](../Flight-booking-Service) | Bookings, payment hold, cron |
+| [Flight-booking-Service](../Flight-booking-Service) | Bookings, payment hold, cron, RabbitMQ mail queue |
 
 ---
 
