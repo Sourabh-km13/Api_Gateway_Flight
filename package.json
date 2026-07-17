@@ -1,12 +1,12 @@
 {
-  "name": "base_node_js_project_template",
+  "name": "api-gateway-flight",
   "version": "1.0.0",
-  "description": "A basic started boilerplate project for node",
+  "description": "API gateway with auth, RBAC, and service proxy for FlySmart",
   "main": "index.js",
   "scripts": {
     "dev": "npx nodemon src/index.js"
   },
-  "author": "Sanket",
+  "author": "sourabh",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
