@@ -11,6 +11,10 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const serverConfig = require('./config/server-config');
 const { AuthMiddleWares } = require('./middlewares');
 const app = express();
+
+// Render (and other reverse proxies) set X-Forwarded-For; required for express-rate-limit.
+app.set('trust proxy', 1)
+
 const limiter = rateLimit({
     windowMs: 2 * 60 * 1000,
     max: 500,
@@ -22,9 +26,16 @@ function pingHealth(healthUrl) {
         const client = url.protocol === 'https:' ? https : http
         const request = client.get(url, (response) => {
             response.resume()
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-                console.error(`Downstream wake failed for ${healthUrl}: HTTP ${response.statusCode}`)
+            const status = response.statusCode
+            if (status >= 200 && status < 300) {
+                return
             }
+            // 502/503 are common while Render free-tier services cold-start; the ping still wakes them.
+            if (status === 502 || status === 503 || status === 504) {
+                console.warn(`Downstream wake pending for ${healthUrl}: HTTP ${status} (service may still be starting)`)
+                return
+            }
+            console.error(`Downstream wake failed for ${healthUrl}: HTTP ${status}`)
         })
         request.setTimeout(90000, () => {
             request.destroy(new Error('Downstream wake timed out'))

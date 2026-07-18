@@ -53,7 +53,7 @@ This service is the **security boundary**. Downstream services trust that authen
 | Role assignment | `POST /api/v1/user/role` — authenticated admin can attach roles |
 | Customer proxy | `/flightservice/*`, `/bookingservice/*` — requires valid JWT |
 | Admin proxy | `/admin/flightservice/*` — requires JWT **and** admin role |
-| Rate limiting | Global Express rate limiter |
+| Rate limiting | Global Express rate limiter (`trust proxy` enabled for Render `X-Forwarded-For`) |
 | Layered design | Routes → Controllers → Services → Repositories → Models |
 | Bootstrap | Roles seeder + optional admin-user seeder |
 
