@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const https = require('https');
 
 const { ServerConfig } = require('./config');
 const apiRoutes = require('./routes');
@@ -14,7 +16,48 @@ const limiter = rateLimit({
     max: 500,
 })
 
+let downstreamWakeStarted = false
+
+function pingHealth(healthUrl) {
+    try {
+        const url = new URL(healthUrl)
+        const client = url.protocol === 'https:' ? https : http
+        const request = client.get(url, (response) => {
+            response.resume()
+            if (response.statusCode < 200 || response.statusCode >= 300) {
+                console.error(`Downstream wake failed for ${healthUrl}: HTTP ${response.statusCode}`)
+            }
+        })
+        request.setTimeout(90000, () => {
+            request.destroy(new Error('Downstream wake timed out'))
+        })
+        request.on('error', (error) => {
+            console.error(`Downstream wake failed for ${healthUrl}:`, error.message)
+        })
+    } catch (error) {
+        console.error(`Downstream wake failed for ${healthUrl}:`, error.message)
+    }
+}
+
+function wakeDownstreamServices() {
+    if (downstreamWakeStarted) {
+        return
+    }
+    downstreamWakeStarted = true
+
+    const serviceBases = [serverConfig.FLIGHT_SERVICE, serverConfig.BOOKING_SERVICE]
+    for (const base of serviceBases) {
+        if (!base) {
+            continue
+        }
+
+        const healthUrl = `${String(base).replace(/\/$/, '')}/health`
+        pingHealth(healthUrl)
+    }
+}
+
 app.get('/health', (req, res) => {
+    wakeDownstreamServices()
     res.status(200).json({
         success: true,
         message: 'API Gateway is healthy'

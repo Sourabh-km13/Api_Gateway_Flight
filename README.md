@@ -71,6 +71,12 @@ This service is the **security boundary**. Downstream services trust that authen
 
 ## Route map
 
+### Health / cold start
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | Public | Returns gateway health immediately. On the **first** call after process boot, fire-and-forgets `GET /health` to `FLIGHT_SERVICE` and `BOOKING_SERVICE` (errors logged; response is never delayed or failed by downstream). |
+
 ### Auth (local)
 
 | Method | Path | Auth | Description |
