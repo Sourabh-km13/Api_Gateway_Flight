@@ -20,33 +20,6 @@ const limiter = rateLimit({
     max: 500,
 })
 
-function pingHealth(healthUrl) {
-    try {
-        const url = new URL(healthUrl)
-        const client = url.protocol === 'https:' ? https : http
-        const request = client.get(url, (response) => {
-            response.resume()
-            const status = response.statusCode
-            if (status >= 200 && status < 300) {
-                return
-            }
-            // 502/503 are common while Render free-tier services cold-start; the ping still wakes them.
-            if (status === 502 || status === 503 || status === 504) {
-                console.warn(`Downstream wake pending for ${healthUrl}: HTTP ${status} (service may still be starting)`)
-                return
-            }
-            console.error(`Downstream wake failed for ${healthUrl}: HTTP ${status}`)
-        })
-        request.setTimeout(90000, () => {
-            request.destroy(new Error('Downstream wake timed out'))
-        })
-        request.on('error', (error) => {
-            console.error(`Downstream wake failed for ${healthUrl}:`, error.message)
-        })
-    } catch (error) {
-        console.error(`Downstream wake failed for ${healthUrl}:`, error.message)
-    }
-}
 
 function wakeDownstreamServices() {
     const serviceBases = [serverConfig.FLIGHT_SERVICE, serverConfig.BOOKING_SERVICE]
@@ -55,8 +28,10 @@ function wakeDownstreamServices() {
             continue
         }
 
-        const healthUrl = `${String(base).replace(/\/$/, '')}/health`
-        pingHealth(healthUrl)
+        fetch(`${base}/health`)
+        .catch(error => {
+                console.log('Wake request sent:', error.message)
+            })
     }
 }
 
@@ -68,13 +43,18 @@ app.use(cors({
 }));
 
 app.get('/health', (req, res) => {
-    wakeDownstreamServices()
     res.status(200).json({
         success: true,
         message: 'API Gateway is healthy'
     });
 });
-
+app.get('/wake', (req, res) => {
+    wakeDownstreamServices()
+    res.status(200).json({
+        success: true,
+        message: 'Waking downstream services'
+    });
+});
 app.use(limiter)
 
 app.use('/flightservice', AuthMiddleWares.checkAuth, createProxyMiddleware({
