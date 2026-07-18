@@ -16,8 +16,6 @@ const limiter = rateLimit({
     max: 500,
 })
 
-let downstreamWakeStarted = false
-
 function pingHealth(healthUrl) {
     try {
         const url = new URL(healthUrl)
@@ -40,11 +38,6 @@ function pingHealth(healthUrl) {
 }
 
 function wakeDownstreamServices() {
-    if (downstreamWakeStarted) {
-        return
-    }
-    downstreamWakeStarted = true
-
     const serviceBases = [serverConfig.FLIGHT_SERVICE, serverConfig.BOOKING_SERVICE]
     for (const base of serviceBases) {
         if (!base) {

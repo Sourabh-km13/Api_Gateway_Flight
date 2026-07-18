@@ -75,7 +75,7 @@ This service is the **security boundary**. Downstream services trust that authen
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/health` | Public | Returns gateway health immediately. On the **first** call after process boot, fire-and-forgets `GET /health` to `FLIGHT_SERVICE` and `BOOKING_SERVICE` (errors logged; response is never delayed or failed by downstream). |
+| GET | `/health` | Public | Returns gateway health immediately. Fire-and-forgets `GET /health` to `FLIGHT_SERVICE` and `BOOKING_SERVICE` on every call (errors logged; response is never delayed or failed by downstream). |
 
 ### Auth (local)
 
