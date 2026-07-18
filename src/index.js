@@ -56,6 +56,13 @@ function wakeDownstreamServices() {
     }
 }
 
+// CORS must run before /health so the SPA can read the wake response in the browser.
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-access-token', 'Authorization'],
+}));
+
 app.get('/health', (req, res) => {
     wakeDownstreamServices()
     res.status(200).json({
@@ -66,11 +73,6 @@ app.get('/health', (req, res) => {
 
 app.use(limiter)
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-access-token', 'Authorization'],
-}));
 app.use('/flightservice', AuthMiddleWares.checkAuth, createProxyMiddleware({
     target: serverConfig.FLIGHT_SERVICE,
     changeOrigin: true,
