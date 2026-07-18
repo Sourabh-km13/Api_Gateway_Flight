@@ -2,6 +2,24 @@
 
 API Gateway for the flight booking platform, serving as the single entry point for all client requests. It handles JWT authentication, role-based access control (RBAC), rate limiting, and reverse-proxy routing before forwarding requests to the Flight and Booking microservices.
 
+![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT_+_RBAC-000000?logo=jsonwebtokens&logoColor=white)
+![bcrypt](https://img.shields.io/badge/Passwords-bcrypt-338833)
+![Proxy](https://img.shields.io/badge/Proxy-http--proxy--middleware-1F6FEB)
+![MySQL](https://img.shields.io/badge/MySQL-Sequelize-4479A1?logo=mysql&logoColor=white)
+
+> **Part of the FlySmart platform** · [Overview](../README.md) · [Live demo](https://flight-frontend-eight.vercel.app/) · [Frontend](../Flight-Frontend) · [Flight Service](../Flight-Service) · [Booking Service](../Flight-booking-Service)
+
+**Public API base URL:** https://api-gateway-flight.onrender.com
+
+### Skills demonstrated
+
+- **Authentication & RBAC** — bcrypt password hashing, JWT issue/verify, and role-gated routes (`customer`, `admin`, `flightcompany`).
+- **API gateway pattern** — a single public entrypoint reverse-proxying to internal services with path rewrites.
+- **Security boundary design** — admin-only mutation paths, no public admin signup, and rate limiting at the edge.
+- **Operational awareness** — `trust proxy` for correct client IPs behind Render, plus a cold-start wake that warms downstream services.
+- **Relational auth model** — a many-to-many `User ↔ Roles` schema with Sequelize migrations and seeders.
+
 ---
 
 ## Role in the system
@@ -157,7 +175,7 @@ npm run db:seed:admin    # admin user only
 
 ```text
 src/
-  config/          # dotenv server config, sequelize config.json
+  config/          # dotenv server config, sequelize config.js
   controllers/     # HTTP adapters
   middlewares/     # validateAuthRequest, checkAuth, isAdmin
   models/          # User, Roles, UserRoles
@@ -174,7 +192,7 @@ src/
 
 ## Configuration
 
-Create `.env` (and Sequelize `src/config/config.json`):
+All configuration is env-driven via `.env` (loaded by `dotenv`). Sequelize reads the DB values through `src/config/config.js` (no committed `config.json`).
 
 ```bash
 PORT=3001
@@ -183,10 +201,18 @@ BOOKING_SERVICE=http://localhost:<booking-port>
 SALT_ROUNDS=10
 JWT_KEY=your-secret
 JWT_EXPIRY=1d
+DB_USER=root
+DB_PASS=
+DB_NAME=Auth
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DIALECT=mysql
 # optional for admin seeder
 ADMIN_EMAIL=admin@flysmart.com
 ADMIN_PASSWORD=admin123
 ```
+
+See [`.env.example`](.env.example) for the full template.
 
 ### Run
 
@@ -194,7 +220,8 @@ ADMIN_PASSWORD=admin123
 npm install
 npx sequelize-cli db:migrate
 npm run db:seed
-npm run dev
+npm run dev      # nodemon (local)
+npm start        # node src/index.js (production)
 ```
 
 ---
@@ -213,6 +240,7 @@ npm run dev
 
 | Repo | Responsibility |
 |------|----------------|
+| [FlySmart overview](../README.md) | Platform overview + live demo |
 | [Flight-Frontend](../Flight-Frontend) | Traveler + admin SPA |
 | [Flight-Service](../Flight-Service) | Flight catalog & seat inventory |
 | [Flight-booking-Service](../Flight-booking-Service) | Bookings, payment hold, cron, RabbitMQ mail queue |
@@ -221,4 +249,4 @@ npm run dev
 
 ## License
 
-Private / educational project.
+Released under the MIT License.
