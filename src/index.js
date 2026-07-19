@@ -21,18 +21,18 @@ const limiter = rateLimit({
 })
 
 
-function wakeDownstreamServices() {
+async function wakeDownstreamServices() {
     const serviceBases = [serverConfig.FLIGHT_SERVICE, serverConfig.BOOKING_SERVICE]
-    for (const base of serviceBases) {
-        if (!base) {
-            continue
-        }
+    const promises = serviceBases.map(base => fetch(`${base}/health`, { method: 'GET' }))
 
-        fetch(`${base}/health`)
-        .catch(error => {
-                console.log('Wake request sent:', error.message)
-            })
-    }
+    const results = await Promise.allSettled(promises);
+    results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+            console.log(`Successfully woke up ${serviceBases[index]}`);
+        } else {
+            console.error(`Failed to wake up ${serviceBases[index]}: ${result.reason}`);
+        }
+    });
 }
 
 // CORS must run before /health so the SPA can read the wake response in the browser.
@@ -48,8 +48,8 @@ app.get('/health', (req, res) => {
         message: 'API Gateway is healthy'
     });
 });
-app.get('/wake', (req, res) => {
-    wakeDownstreamServices()
+app.get('/wake', async (req, res) => {
+    await wakeDownstreamServices()
     res.status(200).json({
         success: true,
         message: 'Waking downstream services'
